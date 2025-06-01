@@ -86,5 +86,5 @@ docker run -p 5020:5000 ghcr.io/losiak99/weather-app-emil:latest
 
 ##  Autor
 
-Emil Loś  
+Emil Łoś Grupa 6.8 numer albumu 99609 
 
