@@ -1,0 +1,74 @@
+name: CI EMIL LOS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Check out the source_repo
+      uses: actions/checkout@v4
+
+    - name: QEMU set-up
+      uses: docker/setup-qemu-action@v3
+
+    - name: Buildx set-up
+      uses: docker/setup-buildx-action@v3
+
+    - name: Docker metadata definitions
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/${{ github.repository_owner }}/weather-app-emil
+        tags: |
+          type=sha
+          type=ref,event=branch
+          type=raw,value=latest
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PAT }}
+
+    - name: Build image to scan (CVE)
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        load: true
+        tags: tempimage:scan
+
+    - name: Scan with Trivy (fail on CRITICAL/HIGH)
+      uses: aquasecurity/trivy-action@v0.13.1
+      with:
+        image-ref: tempimage:scan
+        format: table
+        exit-code: 1
+        severity: CRITICAL,HIGH
+
+    - name:  Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/weather-app-cache
+        cache-to: type=registry,mode=max,ref=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/weather-app-cache
